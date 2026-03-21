@@ -11,4 +11,4 @@ COPY . .
 
 # 4. 포트 설정 및 uvicorn 실행 (Worker 수를 조절하여 안정성 확보)
 EXPOSE 8000
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+CMD ["uvicorn", "dober:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
