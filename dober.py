@@ -21,13 +21,16 @@ class MarketData(BaseModel):
     question: str = "현재 시장 상황을 분석해줘"
 
 def analyze_with_gpt(symbol, current_price, rsi_info, df_summary, user_query, macro_info):
-    # [수정] df_context를 df_summary로 통일하고, 좌표 추출 지시를 더 명확히 함
     prompt = f"""
-    너는 HTF(거시 추세)를 읽고 '3-4-5파 하락 다이버전스'를 포착하는 'Short Specialist' Dober AI야.
-    
+    너는 HTF(거시 추세)를 읽고 엘리어트 파동을 분석하는 'Short Specialist' Dober AI야.
+
     [핵심 미션]
     1. 사용자의 질문 "{user_query}"에 대해 기술적으로 분석하라.
-    2. 제공된 [차트 데이터]의 timestamp를 사용하여 엘리어트 파동(1,2,3,4,5파)의 정확한 좌표를 'visualData'에 담아라.
+    2. 아래 순서로 반드시 분석하라:
+       STEP 1) RSI 다이버전스 확인: 3파 고점 RSI vs 5파 예상 고점 RSI를 비교하여 하락 다이버전스 생성 여부를 먼저 판단하라.
+       STEP 2) 5파 Target Price 계산: 1파 길이 × 0.618 또는 × 1.0을 4파 저점에 더해 예상 5파 고점을 산출하라.
+       STEP 3) 확률이 낮더라도 예상 5파 좌표(Target Point)를 반드시 포함하라. 생략 금지.
+    3. 제공된 [차트 데이터]의 timestamp를 사용하여 파동 좌표를 'visualData'에 담아라.
 
     [차트 데이터 (과거 요약 + 최근 정밀)]
     {df_summary}
@@ -37,15 +40,20 @@ def analyze_with_gpt(symbol, current_price, rsi_info, df_summary, user_query, ma
     - 거시적 관점: {macro_info}
 
     [출력 규칙]
-    반드시 JSON으로만 응답하며, 'points'의 timestamp는 반드시 위 [차트 데이터]에 존재하는 실제 timestamp 값을 그대로 사용할 것. 예시 값을 절대 사용하지 말 것.
+    - 반드시 JSON으로만 응답
+    - points의 timestamp는 [차트 데이터]에 실제 존재하는 값만 사용. 예시 값 절대 금지.
+    - 5파 Target Point의 timestamp는 데이터의 마지막 timestamp 이후 값으로 추정 기입.
+    - reason에는 반드시 RSI 다이버전스 판단 결과와 5파 Target Price를 명시할 것.
     {{
         "decision": "ENTER/STAY",
-        "reason": "분석 리포트 내용",
+        "reason": "## RSI 다이버전스\\n(판단 내용)\\n\\n## 파동 분석\\n(내용)\\n\\n## 5파 Target Price\\n예상가: $XX,XXX (확률 XX%)",
         "visualData": {{
             "points": [
-                {{"label": "1", "type": "low", "timestamp": <차트_데이터의_실제_timestamp>, "price": <실제_가격>}},
-                {{"label": "3", "type": "high", "timestamp": <차트_데이터의_실제_timestamp>, "price": <실제_가격>}},
-                {{"label": "4", "type": "low", "timestamp": <차트_데이터의_실제_timestamp>, "price": <실제_가격>}}
+                {{"label": "1", "type": "low", "timestamp": <실제_timestamp>, "price": <실제_가격>}},
+                {{"label": "2", "type": "high", "timestamp": <실제_timestamp>, "price": <실제_가격>}},
+                {{"label": "3", "type": "high", "timestamp": <실제_timestamp>, "price": <실제_가격>}},
+                {{"label": "4", "type": "low", "timestamp": <실제_timestamp>, "price": <실제_가격>}},
+                {{"label": "5", "type": "high", "timestamp": <마지막_timestamp_이후_추정값>, "price": <5파_target_price>}}
             ]
         }}
     }}
