@@ -67,7 +67,7 @@ def analyze_with_gpt(symbol, current_price, rsi_info, df_summary, user_query, ma
 @app.post("/api/v1/analyze-short")
 async def run_strategy(data: MarketData):
     try:
-        df = pd.read_json(io.StringIO(data.df_json))
+        df = pd.read_json(io.StringIO(data.df_json), convert_dates=False)
 
         # [FIX 3] 숫자 컬럼명("0","1",...) → 명시적 컬럼명으로 변환
         if df.columns[0] in [0, '0']:
