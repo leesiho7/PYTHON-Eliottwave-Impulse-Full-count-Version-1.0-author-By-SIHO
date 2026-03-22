@@ -1,4 +1,5 @@
 import os
+import time
 import pandas as pd
 from fastapi import FastAPI
 from pydantic import BaseModel
@@ -26,8 +27,8 @@ def analyze_with_gpt(symbol, current_price, rsi_info, df_summary, user_query, ma
     
     [핵심 미션]
     1. 사용자의 질문 "{user_query}"에 대해 기술적으로 분석하라.
-    2. 제공된 [차트 데이터]의 timestamp를 사용하여 엘리어트 파동(1,2,3,4,5파)의 정확한 좌표를 'visual_data'에 담아라.
-    
+    2. 제공된 [차트 데이터]의 timestamp를 사용하여 엘리어트 파동(1,2,3,4,5파)의 정확한 좌표를 'visualData'에 담아라.
+
     [차트 데이터 (과거 요약 + 최근 정밀)]
     {df_summary}
 
@@ -36,14 +37,15 @@ def analyze_with_gpt(symbol, current_price, rsi_info, df_summary, user_query, ma
     - 거시적 관점: {macro_info}
 
     [출력 규칙]
-    반드시 JSON으로만 응답하며, 'points'의 timestamp는 데이터에 존재하는 값을 그대로 사용할 것.
+    반드시 JSON으로만 응답하며, 'points'의 timestamp는 반드시 위 [차트 데이터]에 존재하는 실제 timestamp 값을 그대로 사용할 것. 예시 값을 절대 사용하지 말 것.
     {{
         "decision": "ENTER/STAY",
         "reason": "분석 리포트 내용",
-        "visual_data": {{
+        "visualData": {{
             "points": [
-                {{"label": "3", "type": "high", "timestamp": 1711080000000, "price": 70885.5}},
-                {{"label": "4", "type": "low", "timestamp": 1711123200000, "price": 68723.2}}
+                {{"label": "1", "type": "low", "timestamp": <차트_데이터의_실제_timestamp>, "price": <실제_가격>}},
+                {{"label": "3", "type": "high", "timestamp": <차트_데이터의_실제_timestamp>, "price": <실제_가격>}},
+                {{"label": "4", "type": "low", "timestamp": <차트_데이터의_실제_timestamp>, "price": <실제_가격>}}
             ]
         }}
     }}
@@ -66,9 +68,24 @@ def analyze_with_gpt(symbol, current_price, rsi_info, df_summary, user_query, ma
 async def run_strategy(data: MarketData):
     try:
         df = pd.read_json(io.StringIO(data.df_json))
-        df.columns = [str(c).lower() for c in df.columns]
+
+        # [FIX 3] 숫자 컬럼명("0","1",...) → 명시적 컬럼명으로 변환
+        if df.columns[0] in [0, '0']:
+            col_names = ['timestamp', 'open', 'high', 'low', 'close', 'volume', 'turnover']
+            df.columns = col_names[:len(df.columns)]
+        else:
+            df.columns = [str(c).lower() for c in df.columns]
+
         close_col = next((c for c in df.columns if c in ['close', 'c', '4']), df.columns[-1])
         time_col = next((c for c in df.columns if 'time' in c), df.columns[0])
+
+        # [FIX 1] 타임스탬프 현재 시점(2026)으로 동기화
+        current_time_ms = int(time.time() * 1000)
+        last_ts = int(df[time_col].iloc[-1])
+        time_offset = current_time_ms - last_ts
+        if abs(time_offset) > 86400000:  # 1일 이상 차이 날 때만 보정
+            df[time_col] = df[time_col].astype(int) + time_offset
+            logger.info(f"타임스탬프 보정 적용: offset={time_offset}ms")
 
         # 1) RSI 계산
         delta = df[close_col].diff()
