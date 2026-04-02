@@ -60,7 +60,7 @@ def analyze_with_gpt(symbol, current_price, rsi_info, df_summary, user_query, ma
     """
     try:
         response = client.chat.completions.create(
-            model="gpt-4-turbo-preview",
+            model="gpt-4o",
             messages=[
                 {"role": "system", "content": "너는 엘리어트 파동 좌표 추출 전문가다. 데이터의 timestamp와 price를 정확히 매칭하라."},
                 {"role": "user", "content": prompt}
